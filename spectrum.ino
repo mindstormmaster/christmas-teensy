@@ -27,7 +27,10 @@ const int POWER_LED_PIN = 13;          // Output pin for power LED (pin 13 to us
 const int NEO_PIXEL_PIN = 3;           // Output pin for neo pixels.
 const int NEO_PIXEL_COUNT = 110;         // Number of neo pixels.  You should be able to increase this without
                                        // any other changes to the program.
+const int DOT_PIXEL_COUNT = 60;                                       
 const int MAX_CHARS = 65;              // Max size of the input command buffer
+
+const int SCREENSAVER_DELAY = 10;     // Seconds to wait before running "screensaver"
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -43,6 +46,9 @@ Adafruit_NeoPixel pixels = Adafruit_NeoPixel(NEO_PIXEL_COUNT, NEO_PIXEL_PIN, NEO
 char commandBuffer[MAX_CHARS];
 float frequencyWindow[NEO_PIXEL_COUNT+1];
 float hues[NEO_PIXEL_COUNT];
+uint32_t pixelTmp[NEO_PIXEL_COUNT];
+
+unsigned long lastDataTime = 0*1000;
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -200,6 +206,7 @@ void spectrumLoop() {
   // Update each LED based on the intensity of the audio 
   // in the associated frequency window.
   float intensity, otherMean;
+  boolean hasData = false;
   for (int i = 0; i < NEO_PIXEL_COUNT; ++i) {
     windowMean(magnitudes, 
                frequencyToBin(frequencyWindow[i]),
@@ -213,10 +220,67 @@ void spectrumLoop() {
     intensity = intensity < 0.0 ? 0.0 : intensity;
     intensity /= (SPECTRUM_MAX_DB-SPECTRUM_MIN_DB);
     intensity = intensity > 1.0 ? 1.0 : intensity;
-    pixels.setPixelColor(i, pixelHSVtoRGBColor(hues[i], 1.0, intensity, i > 60));
+    pixelTmp[i] = pixelHSVtoRGBColor(hues[i], 1.0, intensity, i >= 60);
+//    pixels.setPixelColor(i, pixelHSVtoRGBColor(hues[i], 1.0, intensity, i > 60));
 //    pixels.setPixelColor(i, pixelWhiteColor(intensity));
+
+    if (intensity > 0) {
+      hasData = true;
+    }
   }
+
+  if (hasData) {
+    lastDataTime = millis();
+  }
+
+  if (millis() - lastDataTime < SCREENSAVER_DELAY*1000) {
+    for (int i = 0; i < NEO_PIXEL_COUNT; ++i) {
+      pixels.setPixelColor(i, pixelTmp[i]);
+    }
+  } else {
+    int steps = (millis() - lastDataTime) / 10;
+    wipe(steps);
+  }
+    
   pixels.show();
+}
+
+void wipe(int steps) {
+  /*
+  for (int i = 0; i < DOT_PIXEL_COUNT; ++i) {
+    pixels.setPixelColor(i, pixelWhiteColor(0));
+  }
+
+  for (int i = 0; i < 1; ++i) {
+    int pixel = random(0, DOT_PIXEL_COUNT);
+    float intensity = (float)random(0, 1000)/1000.0;
+    pixels.setPixelColor(pixel, pixelWhiteColor(intensity));
+  }
+  for (int i = 0; i < 3; ++i) {
+    int pixel = random(0, DOT_PIXEL_COUNT);
+    float intensity = (float)random(0, 500)/1000.0;
+    pixels.setPixelColor(pixel, pixelWhiteColor(intensity));
+  }
+  for (int i = 0; i < 7; ++i) {
+    int pixel = random(0, DOT_PIXEL_COUNT);
+    float intensity = (float)random(0, 250)/1000.0;
+    pixels.setPixelColor(pixel, pixelWhiteColor(intensity));
+  }
+  */
+  
+  for (int i = 0; i < DOT_PIXEL_COUNT; ++i) {
+    long r = max(0, random(-255*40, 255));
+    float intensity = (float)r/1000.0;
+    pixels.setPixelColor(i, pixelWhiteColor(intensity));
+  }
+  
+  // Evenly spread hues across all pixels.
+  for (int i = DOT_PIXEL_COUNT; i < NEO_PIXEL_COUNT; ++i) {
+    int x = i + (steps / 5);
+    x = x % (NEO_PIXEL_COUNT-DOT_PIXEL_COUNT);
+    float hue = 360.0*(float(x)/float(NEO_PIXEL_COUNT-DOT_PIXEL_COUNT-1));
+    pixels.setPixelColor(i, pixelHSVtoRGBColor(hue, 1.0, 0.5, i >= 60));
+  }
 }
 
 
