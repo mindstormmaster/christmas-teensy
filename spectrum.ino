@@ -13,16 +13,16 @@
 // These values can be changed to alter the behavior of the spectrum display.
 ////////////////////////////////////////////////////////////////////////////////
 
-int SAMPLE_RATE_HZ = 9000;             // Sample rate of the audio in hertz.
+int SAMPLE_RATE_HZ = 11025;             // Sample rate of the audio in hertz.
 float SPECTRUM_MIN_DB = 30.0;          // Audio intensity (in decibels) that maps to low LED brightness.
-float SPECTRUM_MAX_DB = 60.0;          // Audio intensity (in decibels) that maps to high LED brightness.
+float SPECTRUM_MAX_DB = 80.0;          // Audio intensity (in decibels) that maps to high LED brightness.
 int LEDS_ENABLED = 1;                  // Control if the LED's should display the spectrum or not.  1 is true, 0 is false.
                                        // Useful for turning the LED display on and off with commands from the serial port.
 const int FFT_SIZE = 256;              // Size of the FFT.  Realistically can only be at most 256 
                                        // without running out of memory for buffers and other state.
 const int AUDIO_INPUT_PIN = 14;        // Input ADC pin for audio data.
 const int ANALOG_READ_RESOLUTION = 10; // Bits of resolution for the ADC.
-const int ANALOG_READ_AVERAGING = 16;  // Number of samples to average with each ADC reading.
+const int ANALOG_READ_AVERAGING = 32;  // Number of samples to average with each ADC reading.
 const int POWER_LED_PIN = 13;          // Output pin for power LED (pin 13 to use Teensy 3.0's onboard LED).
 const int NEO_PIXEL_PIN = 3;           // Output pin for neo pixels.
 const int NEO_PIXEL_COUNT = 110;         // Number of neo pixels.  You should be able to increase this without
@@ -130,7 +130,7 @@ int frequencyToBin(float frequency) {
 
 // Convert from HSV values (in floating point 0 to 1.0) to RGB colors usable
 // by neo pixel functions.
-uint32_t pixelHSVtoRGBColor(float hue, float saturation, float value) {
+uint32_t pixelHSVtoRGBColor(float hue, float saturation, float value, boolean reverseRG) {
   // Implemented from algorithm at http://en.wikipedia.org/wiki/HSL_and_HSV#From_HSV
   float chroma = value * saturation;
   float h1 = float(hue)/60.0;
@@ -167,9 +167,17 @@ uint32_t pixelHSVtoRGBColor(float hue, float saturation, float value) {
   r += m;
   g += m;
   b += m;
+
+  if (reverseRG) {
+    return pixels.Color(int(255*g), int(255*r), int(255*b));
+  }
   return pixels.Color(int(255*r), int(255*g), int(255*b));
 }
 
+
+uint32_t pixelWhiteColor(float intensity) {
+  return pixels.Color(int(255*intensity), int(255*intensity), int(255*intensity));
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 // SPECTRUM DISPLAY FUNCTIONS
@@ -205,7 +213,8 @@ void spectrumLoop() {
     intensity = intensity < 0.0 ? 0.0 : intensity;
     intensity /= (SPECTRUM_MAX_DB-SPECTRUM_MIN_DB);
     intensity = intensity > 1.0 ? 1.0 : intensity;
-    pixels.setPixelColor(i, pixelHSVtoRGBColor(hues[i], 1.0, intensity));
+    pixels.setPixelColor(i, pixelHSVtoRGBColor(hues[i], 1.0, intensity, i > 60));
+//    pixels.setPixelColor(i, pixelWhiteColor(intensity));
   }
   pixels.show();
 }
