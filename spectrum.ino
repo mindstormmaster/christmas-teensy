@@ -47,6 +47,9 @@ char commandBuffer[MAX_CHARS];
 float frequencyWindow[NEO_PIXEL_COUNT+1];
 float hues[NEO_PIXEL_COUNT];
 uint32_t pixelTmp[NEO_PIXEL_COUNT];
+float currentIntensity[DOT_PIXEL_COUNT];
+float targetIntensity[DOT_PIXEL_COUNT];
+float dotHues[DOT_PIXEL_COUNT];
 
 unsigned long lastDataTime = 0*1000;
 
@@ -200,6 +203,11 @@ void spectrumSetup() {
   for (int i = 0; i < NEO_PIXEL_COUNT; ++i) {
     hues[i] = 360.0*(float(i)/float(NEO_PIXEL_COUNT-1));
   }
+
+  for (int i = 0; i < DOT_PIXEL_COUNT; ++i) {
+    currentIntensity[i] = 0.0;
+    targetIntensity[i] = 0.0;
+  }
 }
 
 void spectrumLoop() {
@@ -246,32 +254,41 @@ void spectrumLoop() {
 }
 
 void wipe(int steps) {
-  /*
-  for (int i = 0; i < DOT_PIXEL_COUNT; ++i) {
-    pixels.setPixelColor(i, pixelWhiteColor(0));
+  if (steps % 1 == 0) {
+    for (int i = 0; i < 1; ++i) {
+      int pixel = random(0, DOT_PIXEL_COUNT);
+      if (currentIntensity[pixel] == 0) {
+        float intensity = (float)random(0, 200)/1000.0;
+        if (random(0,10) % 10 == 0) {
+          intensity += (float)random(0, 500)/1000.0;
+        }
+        targetIntensity[pixel] = intensity;
+        dotHues[pixel] = random(0, 360);
+      }
+    }
   }
-
-  for (int i = 0; i < 1; ++i) {
-    int pixel = random(0, DOT_PIXEL_COUNT);
-    float intensity = (float)random(0, 1000)/1000.0;
-    pixels.setPixelColor(pixel, pixelWhiteColor(intensity));
-  }
-  for (int i = 0; i < 3; ++i) {
-    int pixel = random(0, DOT_PIXEL_COUNT);
-    float intensity = (float)random(0, 500)/1000.0;
-    pixels.setPixelColor(pixel, pixelWhiteColor(intensity));
-  }
-  for (int i = 0; i < 7; ++i) {
-    int pixel = random(0, DOT_PIXEL_COUNT);
-    float intensity = (float)random(0, 250)/1000.0;
-    pixels.setPixelColor(pixel, pixelWhiteColor(intensity));
-  }
-  */
   
   for (int i = 0; i < DOT_PIXEL_COUNT; ++i) {
-    long r = max(0, random(-255*40, 255));
-    float intensity = (float)r/1000.0;
-    pixels.setPixelColor(i, pixelWhiteColor(intensity));
+    if (targetIntensity[i] > currentIntensity[i]) {
+      float diff = max(0.05, targetIntensity[i]/5);
+      currentIntensity[i] = currentIntensity[i] + diff;
+
+      // if we reached the target, then reset back to zero
+      if (currentIntensity[i] >= targetIntensity[i]) {
+        targetIntensity[i] = 0.0;
+      }
+    } else if (targetIntensity[i] < currentIntensity[i]) {
+      float diff = max(0.05, currentIntensity[i]/5);
+      currentIntensity[i] = currentIntensity[i] - diff;
+
+      if (currentIntensity[i] <= targetIntensity[i]) {
+        targetIntensity[i] = 0.0;
+        currentIntensity[i] = 0.0;
+      }
+    }
+    
+    pixels.setPixelColor(i, pixelWhiteColor(currentIntensity[i]));
+    //pixels.setPixelColor(i, pixelHSVtoRGBColor(dotHues[i], 1.0, currentIntensity[i], i >= 60));
   }
   
   // Evenly spread hues across all pixels.
